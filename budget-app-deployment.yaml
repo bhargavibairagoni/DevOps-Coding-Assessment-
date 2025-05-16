@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,3 +27,14 @@ spec:
               value: postgres
             - name: DATABASE_PASSWORD
               value: password
+          volumeMounts:
+            - name: rails-host-config-volume
+              mountPath: /app/config/initializers/00_add_budget_local.rb
+              subPath: 00_add_budget_local.rb
+      volumes:
+        - name: rails-host-config-volume
+          configMap:
+            name: rails-host-config
+            items:
+              - key: 00_add_budget_local.rb
+                path: 00_add_budget_local.rb
