@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+name: budget-app
+spec:
+replicas: 1
+selector:
+matchLabels:
+app: budget-app
+template:
+metadata:
+labels:
+app: budget-app
+spec:
+containers:
+\- name: web
+image: bhargavibairagoni/budget-app-web\:one
+command: \["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "3000"]
+ports:
+\- containerPort: 3000
+env:
+\- name: RAILS\_ENV
+value: development
+\- name: DATABASE\_URL
+value: postgres\://postgres\:password\@postgres:5432/Budgy\_development
+\- name: RAILS\_ALLOWED\_HOSTS
+value: "a443ef05fbb094eff852abafdf3a9523-df7c97bbb6f38c10.elb.us-east-1.amazonaws.com"
