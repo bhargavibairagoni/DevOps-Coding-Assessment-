@@ -1,49 +1,41 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgres-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: budget-app-db
+  name: postgres
 spec:
+  serviceName: "postgres"
+  replicas: 1
   selector:
     matchLabels:
-      app: budget-app-db
-  serviceName: "budget-app-db"
-  replicas: 1
+      app: postgres
   template:
     metadata:
       labels:
-        app: budget-app-db
+        app: postgres
     spec:
       containers:
-        - name: postgres
-          image: bhargavibairagoni/postgres:15
-          ports:
-            - containerPort: 5432
-          env:
-            - name: POSTGRES_DB
-              value: budgetdb
-            - name: POSTGRES_USER
-              value: postgres
-            - name: POSTGRES_PASSWORD
-              value: password
-          volumeMounts:
-            - name: postgres-storage
-              mountPath: /var/lib/postgresql/data
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          value: Budgy_development
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          value: password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata  # Use a subdirectory inside the volume mount
+        volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/postgresql/data   # Mount volume here (root mount point)
   volumeClaimTemplates:
-    - metadata:
-        name: postgres-storage
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 1Gi
+  - metadata:
+      name: pgdata
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
