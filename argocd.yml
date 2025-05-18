@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: "postgres"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              value: Budgy_development
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: budget-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: budget-app
+  template:
+    metadata:
+      labels:
+        app: budget-app
+    spec:
+      # Init container runs migrations before the main container starts
+      initContainers:
+        - name: migrate
+          image: bhargavibairagoni/budget-app-web:one
+          command: ["bundle", "exec", "rails", "db:migrate"]
+          env:
+            - name: RAILS_ENV
+              value: development
+            - name: DATABASE_URL
+              value: postgres://postgres:password@postgres:5432/Budgy_development
+          # Mount volumes if your app requires it (optional)
+      containers:
+        - name: web
+          image: bhargavibairagoni/budget-app-web:one
+          command: ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "3000"]
+          ports:
+            - containerPort: 3000
+          env:
+            - name: RAILS_ENV
+              value: development
+            - name: DATABASE_URL
+              value: postgres://postgres:password@postgres:5432/Budgy_development
+            - name: RAILS_ALLOWED_HOSTS
+              value: "a443ef05fbb094eff852abafdf3a9523-df7c97bbb6f38c10.elb.us-east-1.amazonaws.com"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: budget-app-service
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  selector:
+    app: budget-app
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: LoadBalancer
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: budget-app-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: budget-app-service
+                port:
+                  number: 80
